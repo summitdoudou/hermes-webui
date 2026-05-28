@@ -199,7 +199,7 @@ class TestGenerateTitleRawViaAuxTimeout(unittest.TestCase):
         self.assertEqual(captured.get('api_key'), 'test-title-api-key')
 
     def test_title_prompt_requires_matching_user_language(self):
-        """German conversation starts should not invite English title output."""
+        """Conversation starts should get a language-neutral match-language instruction."""
         from api.streaming import generate_title_raw_via_aux
 
         mock_resp = types.SimpleNamespace(
@@ -227,7 +227,23 @@ class TestGenerateTitleRawViaAuxTimeout(unittest.TestCase):
         self.assertEqual(status, 'llm_aux')
         messages = captured.get('messages') or []
         self.assertIn('Match the language of the user question', messages[0]['content'])
-        self.assertIn('If the user writes German, output a German title', messages[0]['content'])
+        self.assertNotIn('If the user writes German', messages[0]['content'])
+        self.assertNotIn('German good:', messages[0]['content'])
+
+    def test_title_prompt_language_rule_is_same_for_supported_locales(self):
+        from api.streaming import _title_prompt_language_rule
+
+        expected = "Match the language of the user question.\n"
+        examples = [
+            'Warum werden hier die Bilder nicht angezeigt?',
+            'Pourquoi les images ne sont-elles pas affichées ?',
+            '¿Por qué no se muestran las imágenes?',
+            '为什么图片没有显示？',
+            'Why are the images not displayed?',
+        ]
+        for text in examples:
+            with self.subTest(text=text):
+                self.assertEqual(_title_prompt_language_rule(text), expected)
 
     def test_german_source_rejects_english_aux_title(self):
         """Regression: an English aux title must not overwrite a German conversation."""

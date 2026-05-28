@@ -1396,13 +1396,6 @@ def _detect_title_language(text: str) -> str:
 
 
 def _title_prompt_language_rule(user_text: str) -> str:
-    lang = _detect_title_language(user_text)
-    if lang == 'de':
-        return (
-            "Match the language of the user question.\n"
-            "If the user writes German, output a German title.\n"
-            "German good: Alte Session Bilder, WebUI Attachment-Pfade, Kontextkompression Status.\n"
-        )
     return "Match the language of the user question.\n"
 
 
