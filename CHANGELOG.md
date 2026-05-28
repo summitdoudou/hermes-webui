@@ -11,6 +11,10 @@
 
 - WebUI's browser-session surface prompt now explicitly tells agents not to dump browser transcripts into external notes or durable memory by default; it limits saving to explicit captures and clearly reusable durable signals such as preferences, decisions, blockers, and runbook-worthy workflows.
 
+### Fixed
+
+- Gateway-backed WebUI chat now forwards configured prefill/session-recall context and a compact WebUI session-context block into delegated Gateway turns, so browser sessions retain note recall, connected-platform awareness, and delivery hints instead of sending only the latest user message. If the dynamic prefill script fails, WebUI falls back to the configured static router prefill when available.
+
 ## [v0.51.156] — 2026-05-28 — Release EB (stage-batch38 — 2-PR Tier B cleanup: WebUI request/runtime hardening + chat-start provider fallback)
 
 ### Fixed
