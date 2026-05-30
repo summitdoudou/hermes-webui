@@ -3,8 +3,11 @@
 
 ## [Unreleased]
 
+## [v0.51.175] — 2026-05-30 — Release EU (stage-batch57 — internal conversation links)
+
 ### Added
 
+- Internal conversation links: a "Copy conversation link" action copies a Markdown reference (`session://<id>`) for any conversation, and `session://` references render as same-origin in-app links that open the target conversation without a full page reload (#3179). Links are sanitized through the existing safe-URL allowlist (rewritten to `/session/<id>`, label escaped, sid URL-encoded — verified against quote-breakout and script-injection payloads).
 - Conversation filtering now recognizes pasted session references directly: raw session IDs, `session://...` references, `/session/...` URLs, and Markdown session links surface the target conversation while preserving normal content-search hits (#3179).
 
 ## [v0.51.174] — 2026-05-30 — Release ET (stage-batch56 — CLI/gateway session usage in Insights)
