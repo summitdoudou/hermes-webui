@@ -104,8 +104,37 @@ def test_small_markdown_uses_shared_rich_render_helper():
 
 def test_force_rich_markdown_reuses_preview_raw_content_without_refetch():
     branch = _markdown_branch()
-    assert "forceRichMarkdown&&path===_previewCurrentPath&&_previewRawContent" in branch
+    # #3378 review (Codex): the cache reuse is guarded on _previewRawContentPath
+    # (the path the cached content belongs to), NOT the tautological
+    # path===_previewCurrentPath (that var was just assigned above).
+    assert "forceRichMarkdown&&path===_previewRawContentPath&&_previewRawContent" in branch
     assert "? {content:_previewRawContent}" in branch
+    assert "_previewRawContentPath = path" in branch
+    # The old tautological guard must be gone.
+    assert "path===_previewCurrentPath&&_previewRawContent" not in branch
+
+
+def test_save_updates_cached_raw_content_for_force_render():
+    """#3378 review (Codex): saving a markdown file from the plain-text fallback
+    must refresh _previewRawContent (and its path) so a later force-render shows the
+    saved text, not the stale pre-edit fetch."""
+    save_idx = WORKSPACE_JS.find("await api('/api/file/save'")
+    assert save_idx != -1, "file save call not found"
+    save_block = WORKSPACE_JS[save_idx:save_idx + 600]
+    assert "_previewRawContent = content" in save_block
+    assert "_previewRawContentPath = _previewCurrentPath" in save_block
+
+
+def test_force_render_blocked_while_editor_dirty_or_open():
+    """#3378 review (Codex): force-render must not fire from a dirty/open editor
+    (cached raw content wouldn't reflect the unsaved edit) and must require cached
+    content belonging to the current file."""
+    start = WORKSPACE_JS.find("function forceRenderMarkdownPreview()")
+    assert start != -1, "forceRenderMarkdownPreview() not found"
+    body = WORKSPACE_JS[start:start + 700]
+    assert "_previewDirty" in body
+    assert "previewEditArea" in body
+    assert "_previewRawContentPath!==_previewCurrentPath" in body
 
 
 def test_preview_mode_resets_force_render_button():

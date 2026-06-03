@@ -501,7 +501,11 @@ function renderMarkdownPreviewContent(data){
 }
 
 function forceRenderMarkdownPreview(){
-  if(!_previewRawContent)return;
+  // #3378 review (Codex): don't force-render from a dirty/open editor — the
+  // cached raw content would not reflect the unsaved edit. Require a saved,
+  // non-dirty state and cached content that belongs to the current file.
+  if(_previewDirty || $('previewEditArea').style.display!=='none') return;
+  if(!_previewRawContent || _previewRawContentPath!==_previewCurrentPath) return;
   openFile(_previewCurrentPath,{forceRichMarkdown:true});
   setStatus('Markdown rendered for this file.');
 }
@@ -554,7 +558,11 @@ async function toggleEditMode(){
         session_id:S.session.session_id, path:_previewCurrentPath, content
       })});
       _previewDirty=false;
-      // Update read-only views
+      // Update read-only views AND the cached raw content so a later
+      // "Render as markdown anyway" force-render reflects the just-saved text
+      // (not the stale pre-edit fetch). #3378 review (Codex).
+      _previewRawContent = content;
+      _previewRawContentPath = _previewCurrentPath;
       if(_previewCurrentMode==='code') $('previewCode').textContent=content;
       else renderMarkdownPreviewContent({content});
       $('previewEditArea').style.display='none';
@@ -580,6 +588,7 @@ async function toggleEditMode(){
 }
 
 let _previewRawContent = '';  // raw text for md files (to populate editor)
+let _previewRawContentPath = '';  // path that _previewRawContent belongs to (#3378 force-render cache guard)
 
 function cancelEditMode(){
   // Discard changes and return to read-only view
@@ -674,10 +683,16 @@ async function openFile(path, opts={}){
   } else if(MD_EXTS.has(ext)){
     // Markdown: fetch text, render with renderMd, display as formatted HTML
     try{
-      const data=forceRichMarkdown&&path===_previewCurrentPath&&_previewRawContent
+      // #3378 review (Codex): only reuse cached raw content when it actually
+      // belongs to the requested path. `path===_previewCurrentPath` is tautological
+      // here (_previewCurrentPath was just assigned above), so guard on the
+      // dedicated _previewRawContentPath instead — otherwise a force-render after a
+      // file switch could re-render the previous file's cached content.
+      const data=forceRichMarkdown&&path===_previewRawContentPath&&_previewRawContent
         ? {content:_previewRawContent}
         : await api(`/api/file?session_id=${encodeURIComponent(S.session.session_id)}&path=${encodeURIComponent(path)}`);
       _previewRawContent = data.content;
+      _previewRawContentPath = path;
       if(!forceRichMarkdown && shouldRenderMarkdownPreviewAsPlainText(data.content)){
         showPreview('code');
         $('previewCode').textContent=data.content;
