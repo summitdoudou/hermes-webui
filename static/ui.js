@@ -7213,6 +7213,13 @@ function renderMessages(options){
       const activityIdxs=[...new Set([...Object.keys(byAssistant).map(k=>parseInt(k)), ...assistantThinking.keys()])].sort((a,b)=>a-b);
       for(const aIdx of activityIdxs){
         const cards=byAssistant[aIdx]||[];
+        if(!cards.length&&assistantThinking.has(aIdx)){
+          const anchorRow=assistantSegments.get(aIdx);
+          if(anchorRow&&window._showThinking!==false){
+            anchorRow.insertAdjacentHTML('beforeend',_thinkingCardHtml(assistantThinking.get(aIdx)));
+          }
+          continue;
+        }
         let anchorRow=assistantSegments.get(aIdx)||null;
         if(!anchorRow&&assistantIdxs.length){
           if(aIdx<assistantIdxs[0]) continue;
@@ -7294,10 +7301,13 @@ function renderMessages(options){
       const failoverText=_gatewayRoutingFailoverText(routing);
       const modelWarningText=_gatewayModelWarningText(routing);
       const hasTurnUsage=!!msg._turnUsage;
-      const compactActivityForMessage=isSimplifiedToolCalling()&&(
-        assistantThinking.has(mi)||
-        toolCallAssistantIdxs.has(mi)
-      );
+      // The activity-group summary owns the "Done in …" duration ONLY when a
+      // group is actually created. A tool-call turn always builds one. A
+      // thinking-only turn under Simplified Tool Calling now renders thinking
+      // inline (no group — see the `continue` at the activityIdxs loop, #3592),
+      // so it must keep its footer duration; suppressing it there would silently
+      // drop "Done in …" for thinking-only turns (#3592 review).
+      const compactActivityForMessage=isSimplifiedToolCalling()&&toolCallAssistantIdxs.has(mi);
       const durationText=compactActivityForMessage?'':_formatTurnDuration(msg._turnDuration);
       if(!hasTurnUsage&&!durationText&&!gatewayText&&!failoverText&&!modelWarningText) continue;
       const seg=assistantSegments.get(mi);

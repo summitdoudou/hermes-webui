@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.258] — 2026-06-04 — Release HZ (stage-r6 — update banner from any panel + inline thinking on settlement)
+
+### Fixed
+- The "update available" banner now appears from **any panel** (Settings → System "Check now", etc.), not just the Chat view — the banner element was positioned so it only rendered visibly on the Chat surface. (#3597, @rodboev)
+- Under Simplified Tool Calling, an assistant turn that produced **thinking but no tool calls** now renders that thinking inline on settlement instead of burying it in an empty collapsed activity group. (#3592, @rodboev)
+
 ## [v0.51.257] — 2026-06-04 — Release HY (stage-r5 — provider refresh route + SessionDB self-heal)
 
 ### Fixed
