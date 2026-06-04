@@ -3,6 +3,11 @@
 
 ## [Unreleased]
 
+## [v0.51.261] — 2026-06-04 — Release IC (stage-r11 — live Todos panel via a todo_state SSE contract)
+
+### Fixed
+- **The Todos side panel now tracks `todo` tool state live during an active run**, instead of staying stale until the turn settled and occasionally rolling back on a reload/SSE-reattach mid-stream. A dedicated `todo_state` SSE event emits a full, redacted, idempotent todo snapshot when the `todo` tool completes (no longer relying on the truncated `tool_complete.preview`); the same `api.todo_state` parser feeds both live emission and cold-load hydration; live snapshots persist into INFLIGHT so reload/reattach restores the panel before the next event; and cold-load vs INFLIGHT snapshots are reconciled by timestamp (including the `coldTs===0` compressed-session edge). The legacy reverse-scan fallback is kept for old servers / upgrade windows. (#3373 follow-up, @v2psv)
+
 ## [v0.51.260] — 2026-06-04 — Release IB (stage-r8 — un-held safety fixes + cron/TTS/mcp/state-toast batch)
 
 ### Fixed
