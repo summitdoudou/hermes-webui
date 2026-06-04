@@ -3,6 +3,11 @@
 
 ## [Unreleased]
 
+## [v0.51.249] — 2026-06-03 — Release HQ (stage-q21 — auto-expand terminal on output toggle)
+
+### Added
+- New **"Auto-expand terminal on output"** preference (Settings → Preferences, **off by default**). When enabled, the collapsed embedded terminal panel surfaces itself automatically the first time a running command emits output, so long-running command output isn't silently collected behind a collapsed panel. The auto-expand does not steal focus from the composer, and fires once per stream (not per output chunk). Mirrors the existing `simplified_tool_calling` setting pattern; default-off means no behavior change on upgrade. (#2974, @rodboev)
+
 ## [v0.51.248] — 2026-06-03 — Release HP (stage-q20 — self-heal deleted WebUI sessions instead of bricking the chat)
 
 ### Fixed
