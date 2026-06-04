@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.259] — 2026-06-04 — Release IA (stage-r7 — edge-TTS Content-Length + orphaned tool_calls strip)
+
+### Fixed
+- **Edge-TTS playback no longer has a ~31s delay / playback error.** `_handle_tts` streamed audio without a `Content-Length` on an HTTP/1.0 server, so clients waited for connection close; audio is now buffered and sent with `Content-Length`. (#3582, @rodboev)
+- **CLI-bridge message reconstruction strips orphaned `tool_calls`** (assistant `tool_calls` with no matching `tool` response, left by an aborted bridge) so the next request no longer 400s on strict providers. (#3583, @rodboev)
+
 ## [v0.51.258] — 2026-06-04 — Release HZ (stage-r6 — update banner from any panel + inline thinking on settlement)
 
 ### Fixed
