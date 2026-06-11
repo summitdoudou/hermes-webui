@@ -5806,7 +5806,12 @@ def handle_get(handler, parsed) -> bool:
             s = get_session(sid, metadata_only=(not load_messages))
             _session_profile = getattr(s, 'profile', None) or None
             _active_profile = _get_active_profile_name()
-            if not _profiles_match(_session_profile, _active_profile):
+            if (
+                load_messages
+                and isinstance(_session_profile, str)
+                and _session_profile.strip()
+                and not _profiles_match(_session_profile, _active_profile)
+            ):
                 return bad(handler, "Session not found", 404)
             original_stream_id = getattr(s, "active_stream_id", None)
             _clear_stale_stream_state(s)
