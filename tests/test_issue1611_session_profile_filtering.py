@@ -297,6 +297,31 @@ def test_get_session_rejects_metadata_only_session_from_inactive_profile():
     assert "json" not in captured, "foreign-profile metadata must not be returned"
 
 
+def test_get_session_rejects_cookieless_session_from_inactive_profile():
+    """Cookieless requests must still enforce the active-profile boundary."""
+    import api.routes as routes
+
+    captured = {}
+
+    def fake_bad(_handler, message, status=400, **_kwargs):
+        captured["bad"] = {"message": message, "status": status}
+        return captured["bad"]
+
+    def fake_j(_handler, data, status=200, **_kwargs):
+        captured["json"] = {"data": data, "status": status}
+        return captured["json"]
+
+    parsed = urlparse("/api/session?session_id=foreign_001&messages=0&resolve_model=0")
+    with patch("api.routes._get_active_profile_name", return_value="default"), \
+         patch("api.routes.get_session", return_value=_ProfileScopedSession()), \
+         patch("api.routes.bad", side_effect=fake_bad), \
+         patch("api.routes.j", side_effect=fake_j):
+        routes.handle_get(SimpleNamespace(headers={}), parsed)
+
+    assert captured.get("bad", {}).get("status") == 404
+    assert "json" not in captured, "cookieless foreign-profile metadata must not be returned"
+
+
 def test_get_session_rejects_cli_session_from_inactive_profile():
     """CLI fallback responses must use the same active-profile boundary."""
     import api.routes as routes

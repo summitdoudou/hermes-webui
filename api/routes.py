@@ -202,19 +202,14 @@ def _all_profiles_query_flag(parsed_url) -> bool:
 def _session_visible_to_active_profile(session_profile, handler=None) -> bool:
     """Return whether a detail-load session belongs to the active profile.
 
-    Apply the /api/sessions profile boundary when the request has an explicit
-    profile scope (cookie/TLS). Direct unit-callers without request profile
-    context keep the historical metadata-load behavior.
+    Real request handlers must enforce the same profile boundary as
+    /api/sessions, even when the request has no hermes_profile cookie and the
+    process-level active profile is the default/root profile. Direct unit-callers
+    without a request handler keep the historical metadata-load behavior.
     """
-    active_profile = _get_active_profile_name()
-    explicit_scope = active_profile not in (None, "", "default")
-    try:
-        cookie = handler.headers.get("Cookie", "") if handler is not None else ""
-        explicit_scope = explicit_scope or "hermes_profile=" in str(cookie)
-    except Exception:
-        pass
-    if not explicit_scope:
+    if handler is None:
         return True
+    active_profile = _get_active_profile_name()
     if not isinstance(session_profile, str):
         session_profile = None
     return _profiles_match(session_profile, active_profile)
