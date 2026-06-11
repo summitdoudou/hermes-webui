@@ -431,6 +431,150 @@ def test_session_export_allows_session_from_active_profile():
     assert ("Cache-Control", "no-store") in handler.sent_headers
 
 
+# ── Sibling session read/mutate paths must also honor active profile ───────
+#
+# /api/session and /api/session/export are not the only routes that load a
+# session by id and return (or mutate) its transcript. duplicate / update /
+# truncate / import_cli all loaded by id without the active-profile boundary,
+# so a foreign-profile transcript could leak or be mutated by a caller scoped
+# to a different profile. These guards close that class.
+
+
+def test_session_duplicate_rejects_session_from_inactive_profile():
+    """POST /api/session/duplicate must not copy/return a foreign-profile transcript."""
+    import api.routes as routes
+
+    captured = {}
+
+    def fake_bad(_handler, message, status=400, **_kwargs):
+        captured["bad"] = {"message": message, "status": status}
+        return captured["bad"]
+
+    def fake_j(_handler, data, status=200, **_kwargs):
+        captured["json"] = {"data": data, "status": status}
+        return captured["json"]
+
+    foreign = SimpleNamespace(
+        session_id="foreign_dup_001",
+        profile="other",
+        title="Foreign",
+        messages=[{"role": "user", "content": "foreign profile secret"}],
+    )
+    parsed = urlparse("/api/session/duplicate")
+    body = {"session_id": "foreign_dup_001"}
+    with patch("api.routes._get_active_profile_name", return_value="default"), \
+         patch("api.routes._check_csrf", return_value=True), \
+         patch("api.routes.read_body", return_value=body), \
+         patch("api.routes.Session") as MockSession, \
+         patch("api.routes.bad", side_effect=fake_bad), \
+         patch("api.routes.j", side_effect=fake_j):
+        MockSession.load.return_value = foreign
+        routes.handle_post(SimpleNamespace(headers={}), parsed)
+
+    assert captured.get("bad", {}).get("status") == 404
+    assert "json" not in captured, "foreign-profile transcript must not be duplicated/returned"
+
+
+def test_session_update_rejects_session_from_inactive_profile():
+    """POST /api/session/update must not read/mutate a foreign-profile session."""
+    import api.routes as routes
+
+    captured = {}
+
+    def fake_bad(_handler, message, status=400, **_kwargs):
+        captured["bad"] = {"message": message, "status": status}
+        return captured["bad"]
+
+    def fake_j(_handler, data, status=200, **_kwargs):
+        captured["json"] = {"data": data, "status": status}
+        return captured["json"]
+
+    foreign = SimpleNamespace(
+        session_id="foreign_upd_001",
+        profile="other",
+        workspace="/tmp/foreign",
+        model="gpt-test",
+        model_provider="openai",
+        messages=[{"role": "user", "content": "foreign profile secret"}],
+    )
+    parsed = urlparse("/api/session/update")
+    body = {"session_id": "foreign_upd_001", "workspace": "/tmp/x"}
+    with patch("api.routes._get_active_profile_name", return_value="default"), \
+         patch("api.routes._check_csrf", return_value=True), \
+         patch("api.routes.read_body", return_value=body), \
+         patch("api.routes.get_session", return_value=foreign), \
+         patch("api.routes.bad", side_effect=fake_bad), \
+         patch("api.routes.j", side_effect=fake_j):
+        routes.handle_post(SimpleNamespace(headers={}), parsed)
+
+    assert captured.get("bad", {}).get("status") == 404
+    assert "json" not in captured, "foreign-profile session must not be updated/returned"
+
+
+def test_session_truncate_rejects_session_from_inactive_profile():
+    """POST /api/session/truncate must not read/mutate a foreign-profile session."""
+    import api.routes as routes
+
+    captured = {}
+
+    def fake_bad(_handler, message, status=400, **_kwargs):
+        captured["bad"] = {"message": message, "status": status}
+        return captured["bad"]
+
+    def fake_j(_handler, data, status=200, **_kwargs):
+        captured["json"] = {"data": data, "status": status}
+        return captured["json"]
+
+    foreign = SimpleNamespace(
+        session_id="foreign_trunc_001",
+        profile="other",
+        messages=[{"role": "user", "content": "foreign profile secret"}],
+    )
+    parsed = urlparse("/api/session/truncate")
+    body = {"session_id": "foreign_trunc_001", "keep_count": 1}
+    with patch("api.routes._get_active_profile_name", return_value="default"), \
+         patch("api.routes._check_csrf", return_value=True), \
+         patch("api.routes.read_body", return_value=body), \
+         patch("api.routes.get_session", return_value=foreign), \
+         patch("api.routes.bad", side_effect=fake_bad), \
+         patch("api.routes.j", side_effect=fake_j):
+        routes.handle_post(SimpleNamespace(headers={}), parsed)
+
+    assert captured.get("bad", {}).get("status") == 404
+    assert "json" not in captured, "foreign-profile session must not be truncated/returned"
+
+
+def test_session_import_cli_rejects_existing_sidecar_from_inactive_profile():
+    """_handle_session_import_cli must not refresh/return a foreign-profile sidecar."""
+    import api.routes as routes
+
+    captured = {}
+
+    def fake_bad(_handler, message, status=400, **_kwargs):
+        captured["bad"] = {"message": message, "status": status}
+        return captured["bad"]
+
+    def fake_j(_handler, data, status=200, **_kwargs):
+        captured["json"] = {"data": data, "status": status}
+        return captured["json"]
+
+    foreign = SimpleNamespace(
+        session_id="foreign_cli_001",
+        profile="other",
+        messages=[{"role": "user", "content": "foreign profile secret"}],
+    )
+    body = {"session_id": "foreign_cli_001"}
+    with patch("api.routes._get_active_profile_name", return_value="default"), \
+         patch("api.routes.Session") as MockSession, \
+         patch("api.routes.bad", side_effect=fake_bad), \
+         patch("api.routes.j", side_effect=fake_j):
+        MockSession.load.return_value = foreign
+        routes._handle_session_import_cli(SimpleNamespace(headers={}), body)
+
+    assert captured.get("bad", {}).get("status") == 404
+    assert "json" not in captured, "foreign-profile CLI sidecar must not be refreshed/returned"
+
+
 # ── Cleanup ────────────────────────────────────────────────────────────────
 
 

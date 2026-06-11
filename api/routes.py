@@ -7243,7 +7243,12 @@ def handle_post(handler, parsed) -> bool:
                 # 404, not 400 — missing resource, not a malformed request.
                 return bad(handler, "Session not found", status=404)
 
-            # Deep-copy mutable lists so the duplicate is *actually* independent.
+            # Same active-profile boundary as /api/session: a foreign-profile
+            # session must not be duplicated (which would otherwise copy and
+            # return its transcript to a caller scoped to a different profile).
+            if not _session_visible_to_active_profile(getattr(session, "profile", None), handler):
+                return bad(handler, "Session not found", status=404)
+
             # `Session.__init__` does `self.messages = messages or []` — plain
             # assignment, no copy. Without deepcopy, both sessions share the same
             # list object in memory; appending to one mutates the other.
@@ -7639,6 +7644,8 @@ def handle_post(handler, parsed) -> bool:
             s = get_session(body["session_id"])
         except KeyError:
             return bad(handler, "Session not found", 404)
+        if not _session_visible_to_active_profile(getattr(s, "profile", None), handler):
+            return bad(handler, "Session not found", 404)
         old_ws = getattr(s, "workspace", "")
         old_model = getattr(s, "model", None)
         old_provider = getattr(s, "model_provider", None)
@@ -7821,6 +7828,8 @@ def handle_post(handler, parsed) -> bool:
         try:
             s = get_session(body["session_id"])
         except KeyError:
+            return bad(handler, "Session not found", 404)
+        if not _session_visible_to_active_profile(getattr(s, "profile", None), handler):
             return bad(handler, "Session not found", 404)
         # Validate keep_count before it reaches the destructive `messages[:keep]`
         # slice. A non-numeric value would raise ValueError and surface as a
@@ -15769,6 +15778,10 @@ def _handle_session_import_cli(handler, body):
     # Check if already imported — refresh messages from CLI store if new ones arrived
     existing = Session.load(sid)
     if existing:
+        # Same active-profile boundary as /api/session: don't refresh or return a
+        # foreign-profile sidecar's transcript to a caller scoped elsewhere.
+        if not _session_visible_to_active_profile(getattr(existing, "profile", None), handler):
+            return bad(handler, "Session not found", 404)
         fresh_msgs = get_cli_session_messages(sid)
         changed = False
         cli_meta = None
