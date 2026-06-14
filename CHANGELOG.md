@@ -3,6 +3,13 @@
 
 ## [Unreleased]
 
+## [v0.51.410] — 2026-06-14 — Release NW (chat Mermaid lightbox + workspace CSV table preview, #4075/#4025)
+
+### Added
+
+- **Rendered Mermaid diagrams can now be enlarged in chat (#4075).** Clicking a Mermaid diagram opens it in the existing fullscreen lightbox so larger graphs are readable without leaving the conversation. (#4075)
+- **CSV files now preview as formatted tables in the workspace (#4025).** The workspace file preview reuses the existing chat CSV table renderer (with a 256 KB cap and clear error states for oversized/empty/malformed files) instead of showing raw comma-separated text, matching how CSVs already render inline in messages. (#4025)
+
 ## [v0.51.409] — 2026-06-14 — Release NV (provider-gate title-gen reasoning extra_body, #4161/#2083)
 
 ### Fixed
