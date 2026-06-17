@@ -11393,7 +11393,10 @@ def _handle_tts(handler, parsed):
             pass  # fall back to defaults
 
         # Validate voice_id is a safe path segment (no traversal)
-        if not re.match(r'^[A-Za-z0-9_-]+$', voice_id):
+        # fullmatch (not match) so a trailing newline can't slip past the `$`
+        # anchor — defense-in-depth on the config-derived voice_id before it
+        # goes into the request URL (#3510 review).
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', voice_id):
             from api.helpers import bad as _bad
             return _bad(handler, "invalid voice_id in config", 400)
 
