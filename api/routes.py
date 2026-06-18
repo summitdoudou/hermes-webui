@@ -4159,8 +4159,25 @@ def _session_model_identity_matches(
     resolved = str(resolved_model or "").strip()
     if not stored or not resolved:
         return False
-    stored_bare, stored_explicit_provider = _split_provider_qualified_model(stored)
-    resolved_bare, resolved_explicit_provider = _split_provider_qualified_model(resolved)
+
+    def _split_model_identity(value: str) -> tuple[str, str | None]:
+        # Handle BOTH provider-qualified shapes so a slash-prefixed session model
+        # (e.g. ``deepseek/deepseek-v4-1m``, OpenRouter-style) compares equal to its
+        # resolved bare id. ``_split_provider_qualified_model`` only handles the
+        # ``@provider:model`` form; without the slash case a reload of a
+        # slash-stored model is wrongly treated as a model change, bypassing the
+        # #4248 256k-clobber guard (Codex regression gate, v0.51.x).
+        bare, prov = _split_provider_qualified_model(value)
+        if prov is None and "/" in value:
+            prefix, rest = value.split("/", 1)
+            prefix = prefix.strip()
+            rest = rest.strip()
+            if prefix and rest:
+                return rest, prefix
+        return bare, prov
+
+    stored_bare, stored_explicit_provider = _split_model_identity(stored)
+    resolved_bare, resolved_explicit_provider = _split_model_identity(resolved)
     stored_provider_norm = _canonical_context_provider(stored_explicit_provider or stored_provider)
     resolved_provider_norm = _canonical_context_provider(resolved_explicit_provider or resolved_provider)
     if stored == resolved and stored_provider_norm == resolved_provider_norm:
