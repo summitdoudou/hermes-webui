@@ -3,6 +3,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Conversation outline FAB no longer overlaps the scroll-to-bottom control (#4381).** The outline toggle now shares the chat message-shell positioning context with the existing scroll controls and stacks above the bottom-right scroll button, so composer height changes no longer place the two circular controls on top of each other.
+
 ## [v0.51.486] — 2026-06-18 — Release QV (archived cron runs stay hidden on state.db re-projection)
 
 ### Fixed
