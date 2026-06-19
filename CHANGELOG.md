@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.506] — 2026-06-18 — Release RQ (harden destructive workspace Git paths against repo-local execution)
+
+### Security
+
+- **Opening or operating on an untrusted Git repository in the workspace can no longer execute arbitrary commands the repo planted in its own config or hooks (#3777).** Workspace Git operations now run with a hardened configuration that neutralizes repo-local execution vectors — `core.fsmonitor`, `core.sshCommand`, `core.gitProxy`, `credential.helper`, `core.askPass`, `protocol.ext.allow`, GPG/signing programs, `core.alternateRefsCommand`, submodule recursion, and `filter`/`merge`/remote-helper programs — and redirects Git hooks to an empty directory on every ref-mutating and destructive operation (including Fetch, which fires the `reference-transaction` hook). Repo-derived config overrides are delivered exclusively via the `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` environment form so an attacker-controlled filter/section name containing `=` cannot inject configuration. When a repository defines local content filters, the content-rewriting actions (stage, discard, pull, checkout/switch, stash restore, selected-commit staging) fail closed with a clear message rather than silently writing unfiltered bytes. Thanks @rodboev.
+
 ## [v0.51.505] — 2026-06-18 — Release RP (allow macOS Mail `message:` links in chat markdown)
 
 ### Fixed
