@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.517] — 2026-06-19 — Release SB (multi-container gateway URL config)
+
+### Fixed
+
+- **Cron jobs and gateway-backed features are reachable again in multi-container deployments (#4483).** The two- and three-container compose files now set `HERMES_API_URL=http://hermes-agent:8642` on the `hermes-webui` service, which `api/agent_health.py` consumes to locate the gateway — without it, a multi-container setup showed a spurious "gateway not configured" banner and couldn't reach cron jobs. The single-container default is unchanged (the var is unset there, falling back to local checks), and `docs/docker.md`'s stale `hermes:8642` default is corrected to `hermes-agent:8642`. Thanks @franksong2702.
+
 ## [v0.51.516] — 2026-06-19 — Release SA (stage per-session toolsets before the first message)
 
 ### Fixed
