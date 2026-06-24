@@ -1596,12 +1596,27 @@ def _skill_tree_max_mtime_ns(skills_dir: Path, config_path: Path) -> int:
     if not skills_dir.is_dir():
         return max_ns
     try:
+        from agent.skill_utils import EXCLUDED_SKILL_DIRS, SKILL_SUPPORT_DIRS
+    except Exception:
+        EXCLUDED_SKILL_DIRS = frozenset()
+        SKILL_SUPPORT_DIRS = frozenset()
+    try:
         # Directory mtimes catch nested out-of-band deletes that leave file mtimes unchanged.
         # followlinks=True mirrors agent.skill_utils.iter_skill_index_files (the compute
         # path), so a symlinked skill directory is descended into and edits to its target
         # SKILL.md change the probe value — otherwise such edits would stay stale up to the TTL.
         for root, dirnames, filenames in os.walk(skills_dir, followlinks=True):
             root_path = Path(root)
+            # Prune the SAME trees iter_skill_index_files prunes (.git/.venv/
+            # node_modules/site-packages + skill support dirs), so a skill that
+            # vendors a dependency tree doesn't make this every-call probe walk
+            # thousands of irrelevant files and defeat the cache's perf goal.
+            has_skill_md = "SKILL.md" in filenames
+            dirnames[:] = [
+                d for d in dirnames
+                if d not in EXCLUDED_SKILL_DIRS
+                and not (has_skill_md and d in SKILL_SUPPORT_DIRS)
+            ]
             try:
                 max_ns = max(max_ns, root_path.stat().st_mtime_ns)
             except OSError:

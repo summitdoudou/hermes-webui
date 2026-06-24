@@ -343,6 +343,35 @@ class TestSymlinkedSkillProbeFollowsLinks:
             "probe must follow the symlinked skill dir and see the target SKILL.md mtime change"
         )
 
+    def test_probe_prunes_dependency_trees_like_compute_path(self, profiles_mod):
+        """The probe must NOT descend into pruned trees (.venv/node_modules/
+        site-packages/support dirs) — matching iter_skill_index_files — so a
+        skill that vendors a dependency tree doesn't make this every-call probe
+        walk thousands of irrelevant files. A mtime change DEEP inside a pruned
+        dir must NOT move the probe value (it's not part of the skill index)."""
+        mod, profile_dir = profiles_mod
+        skills_dir = profile_dir / "skills"
+        skill = skills_dir / "vendored"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: vendored\n---\n# vendored\n", encoding="utf-8")
+        # A vendored dependency tree that the compute path prunes.
+        buried = skill / "node_modules" / "pkg"
+        buried.mkdir(parents=True)
+        buried_file = buried / "index.js"
+        buried_file.write_text("// dep\n", encoding="utf-8")
+
+        before = mod._skill_tree_max_mtime_ns(skills_dir, profile_dir / "config.yaml")
+        import os as _os
+        future = time.time() + 1000
+        _os.utime(buried_file, (future, future))
+        _os.utime(buried, (future, future))
+        after = mod._skill_tree_max_mtime_ns(skills_dir, profile_dir / "config.yaml")
+
+        assert after == before, (
+            "probe must prune node_modules/ (not descend) — a change inside a pruned "
+            f"dependency tree must not move the probe value (before={before}, after={after})"
+        )
+
 
 class TestReturnSignature:
     """Proof matrix row 6: return signature is tuple[int, int]."""
