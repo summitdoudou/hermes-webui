@@ -138,7 +138,13 @@ def test_advanced_watermark_keeps_post_edit_state_rows():
 def test_active_watermark_still_filters_replaced_tail_empty_sidecar():
     """A positive watermark (advanced to the new user-turn timestamp) with an
     empty sidecar must suppress the replaced pre-edit tail while keeping
-    post-edit rows (#4767 / CORE finding #2)."""
+    post-edit rows (#4767 / CORE finding #2).
+
+    A genuinely-advanced session persists the original cutoff as
+    ``truncation_boundary`` (@100, the last kept reply before the replaced tail)
+    alongside the advanced watermark (@200, the new committed turn). The
+    reconstruction keeps ts <= boundary plus ts >= watermark and drops the
+    replaced (boundary, watermark) suffix."""
     state = _rows(
         ("user", "q1", 50),
         ("assistant", "a1", 100),
@@ -148,7 +154,7 @@ def test_active_watermark_still_filters_replaced_tail_empty_sidecar():
         ("assistant", "a2-new", 300),   # post-edit reply -> kept
     )
     merged = models.merge_session_messages_append_only(
-        [], state, truncation_watermark=200.0
+        [], state, truncation_watermark=200.0, truncation_boundary=100.0
     )
     assert [m["content"] for m in merged] == ["q1", "a1", "edited-q2", "a2-new"]
 

@@ -73,7 +73,9 @@ def test_core_a_empty_sidecar_resurrects_deleted_turns():
 
 
 def test_core_a_single_deleted_turn_still_works():
-    """Sanity check: backward-scan handles one deleted turn correctly."""
+    """Sanity check: an advanced watermark with the original cutoff persisted
+    as truncation_boundary keeps the prefix + post-edit tail and drops the one
+    deleted turn."""
     state = [
         _msg("user", "first msg", 50.0),
         _msg("assistant", "first reply", 51.0),
@@ -83,8 +85,10 @@ def test_core_a_single_deleted_turn_still_works():
         _msg("assistant", "post-edit reply", 201.0),
     ]
 
+    # Original cutoff kept through the first reply (@51); a new turn was then
+    # committed (@200), advancing the watermark. boundary (51) < watermark (200).
     merged = models.merge_session_messages_append_only(
-        [], state, truncation_watermark=200.0
+        [], state, truncation_watermark=200.0, truncation_boundary=51.0
     )
 
     contents = [m["content"] for m in merged]
@@ -93,6 +97,59 @@ def test_core_a_single_deleted_turn_still_works():
     ]
     assert contents == expected, (
         f"Sanity: expected {expected}, got {contents}"
+    )
+
+
+def test_core_a_not_advanced_watermark_equals_boundary_does_not_resurrect():
+    """Just-truncated state (boundary == watermark, no new turn committed yet):
+    everything above the watermark is the deleted suffix and must NOT be kept.
+
+    Reachable via crash/cold-load metadata-vs-sidecar divergence — the exact
+    scenario the empty-sidecar branch serves. Opus gate found that the prior
+    code swept the suffix into `at_or_after` here, resurrecting deleted turns
+    (the same data-loss class this fix exists to kill)."""
+    state = [
+        _msg("user", "u1", 50.0),
+        _msg("assistant", "a1", 51.0),
+        _msg("user", "deleted-u2", 100.0),
+        _msg("assistant", "deleted-a2", 101.0),
+        _msg("user", "deleted-u3", 150.0),
+        _msg("assistant", "deleted-a3", 151.0),
+    ]
+
+    merged = models.merge_session_messages_append_only(
+        [], state, truncation_watermark=51.0, truncation_boundary=51.0
+    )
+
+    contents = [m["content"] for m in merged]
+    assert contents == ["u1", "a1"], (
+        f"watermark==boundary must keep only ts<=watermark, got {contents}"
+    )
+
+
+def test_core_a_legacy_none_boundary_frozen_watermark_does_not_resurrect():
+    """Legacy session (truncation_boundary is None) with a positive watermark:
+    in the pre-#4767 model a persisted positive watermark always meant
+    'frozen at cutoff' (committing a turn cleared it to None), so the safe
+    behavior is the conservative ts<=watermark filter — no resurrection, and
+    the legitimately-kept first turn survives."""
+    state = [
+        _msg("user", "u1", 50.0),
+        _msg("assistant", "a1", 51.0),
+        _msg("user", "deleted-u2", 100.0),
+        _msg("assistant", "deleted-a2", 101.0),
+        _msg("user", "deleted-u3", 150.0),
+        _msg("assistant", "deleted-a3", 151.0),
+    ]
+
+    merged = models.merge_session_messages_append_only(
+        [], state, truncation_watermark=51.0  # boundary defaults to None
+    )
+
+    contents = [m["content"] for m in merged]
+    assert contents == ["u1", "a1"], (
+        f"legacy None-boundary frozen watermark must keep only ts<=watermark "
+        f"(no resurrection, keep u1), got {contents}"
     )
 
 

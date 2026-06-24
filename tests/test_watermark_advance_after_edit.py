@@ -353,7 +353,16 @@ def test_empty_sidecar_advanced_watermark_no_ghost_no_data_loss():
     resurrecting stale pre-edit ghosts (#4767).
 
     Reproduction: cold reload / crash recovery before sidecar persists.
-    state.db has the full lineage including replaced pre-edit rows."""
+    state.db has the full lineage including replaced pre-edit rows.
+
+    A genuinely-advanced session persists the original cutoff as
+    ``truncation_boundary`` (here @51, the last kept reply) while the watermark
+    is advanced to the new committed turn (@200). The reconstruction keeps the
+    legitimate prefix (ts <= boundary) plus the post-edit tail (ts >= watermark)
+    and drops the replaced (boundary, watermark) suffix. Passing the boundary is
+    required — an advanced watermark with NO boundary is the unreachable
+    legacy/frozen state (see the not-advanced regression tests in
+    test_core_data_loss_cases.py)."""
     state = [
         {"role": "user", "content": "first msg", "timestamp": 50},
         {"role": "assistant", "content": "first reply", "timestamp": 51},
@@ -363,7 +372,7 @@ def test_empty_sidecar_advanced_watermark_no_ghost_no_data_loss():
         {"role": "assistant", "content": "post-edit reply", "timestamp": 201},
     ]
     merged = models.merge_session_messages_append_only(
-        [], state, truncation_watermark=200.0
+        [], state, truncation_watermark=200.0, truncation_boundary=51.0
     )
     contents = [m["content"] for m in merged]
     wanted = ["first msg", "first reply", "edited/new turn", "post-edit reply"]

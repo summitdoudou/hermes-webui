@@ -5135,45 +5135,48 @@ def merge_session_messages_append_only(
             # Truncate-to-empty sentinel (#2914) — block all replay.
             return []
         else:
-            # Positive watermark advanced after edit/retry/undo (#4767).
-            # Without a sidecar there's no seen_content_keys to check against,
-            # so we reconstruct the correct transcript from state.db alone.
+            # Positive watermark after edit/retry/undo (#4767).  Without a
+            # sidecar there's no seen_content_keys to check against, so we
+            # reconstruct the correct transcript from state.db alone.
             #
-            # Use truncation_boundary (the original truncate cutoff) to
-            # distinguish legitimate prefix from deleted suffix.  Without it,
-            # fall back to the backward-scan heuristic (drops last user+assistant
-            # pair) which works for the common single-turn case.
+            # `at_or_after` (ts >= watermark) is legitimate POST-EDIT content
+            # ONLY when the watermark was ADVANCED strictly past the original
+            # truncate cutoff — i.e. a new turn was committed after the edit, so
+            # truncation_boundary (the original cutoff) is strictly below the
+            # advanced watermark.  In that state we keep the legitimate prefix
+            # (ts <= boundary) plus the post-edit tail (ts >= watermark) and drop
+            # the deleted (boundary, watermark) suffix.
+            #
+            # In every OTHER state the content above the watermark is the deleted
+            # suffix, NOT post-edit content, so keeping it would resurrect deleted
+            # turns (the exact data-loss this fix exists to kill):
+            #   * boundary == watermark — just truncated, no new turn committed
+            #     yet (e.g. crash/cold-load with metadata-vs-sidecar divergence);
+            #   * boundary is None — legacy session saved before this field
+            #     existed.  In the pre-#4767 model committing a turn CLEARED the
+            #     watermark to None, so a persisted positive watermark always
+            #     meant "frozen at cutoff, not advanced".
+            # For all of those, fall back to the conservative pre-#4767 filter
+            # `ts <= watermark`, which never resurrects a deleted suffix.
             boundary_ts = _message_timestamp_as_float({"timestamp": truncation_boundary})
-            at_or_after = []
-            pre_watermark = []
-            for msg in state_messages:
-                ts = _message_timestamp_as_float(msg)
-                if ts is not None and ts >= watermark_timestamp:
-                    at_or_after.append(msg)
-                else:
-                    pre_watermark.append(msg)
-            if boundary_ts is not None:
-                # Use the persisted boundary: keep only messages at or before it.
+            if boundary_ts is not None and boundary_ts < watermark_timestamp:
                 pre_legitimate = [
-                    m for m in pre_watermark
+                    m for m in state_messages
                     if (ts := _message_timestamp_as_float(m)) is not None
                     and ts <= boundary_ts
                 ]
+                at_or_after = [
+                    m for m in state_messages
+                    if (ts := _message_timestamp_as_float(m)) is not None
+                    and ts >= watermark_timestamp
+                ]
                 filtered = pre_legitimate + at_or_after
             else:
-                # Fallback: backward scan (works when exactly one turn was
-                # deleted — the common edit/retry/undo case).
-                i = len(pre_watermark) - 1
-                while i >= 0:
-                    role = str(pre_watermark[i].get("role", "")).lower()
-                    if role == "assistant":
-                        i -= 1
-                    elif role == "user":
-                        i -= 1  # skip this user message too (the replaced prompt)
-                        break
-                    else:
-                        i -= 1  # tool messages etc. — skip
-                filtered = pre_watermark[:i + 1] + at_or_after
+                filtered = [
+                    m for m in state_messages
+                    if (ts := _message_timestamp_as_float(m)) is not None
+                    and ts <= watermark_timestamp
+                ]
 
         # Deduplicate true duplicates (same role, content, exact timestamp)
         # without collapsing legitimately-repeated identical turns (#3346).
@@ -5270,14 +5273,8 @@ def merge_session_messages_append_only(
         # advanced), allow state rows newer than the sidecar tail to merge.
         sidecar_advanced_past_watermark = (
             watermark_timestamp is not None
-            and (
-                (max_sidecar_timestamp is not None
-                 and max_sidecar_timestamp > watermark_timestamp)
-                # If the sidecar is empty but watermark > 0, the session has
-                # advanced (a new user turn was committed).  Treat this as
-                # advanced so post-edit state.db rows are not dropped.
-                or (not sidecar_messages and watermark_timestamp > 0)
-            )
+            and max_sidecar_timestamp is not None
+            and max_sidecar_timestamp > watermark_timestamp
         )
         if (
             watermark_timestamp is not None
