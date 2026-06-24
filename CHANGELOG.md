@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.629] — 2026-06-24 — Release WJ (macOS workspace drag-drop now lands)
+
+### Fixed
+
+- **Dragging a file or folder in the workspace tree now works on macOS.** macOS WebKit strips custom drag MIME types (`application/ws-path`) during `dragover`/`drop`, leaving only `text/plain`, so the move was silently rejected on macOS (it worked on Linux/Windows Chromium, which preserve the custom type). The drop handler now also recognizes an in-flight workspace drag via a module-scoped active-drag flag, and only treats a stripped-MIME `text/plain` drop as a move when its payload matches the dragged path — a foreign text drag from another app can't trigger a move, and the flag is cleared on `dragend`/`drop`/`pagehide`/`blur` so an abandoned drag can't leave it set. Thanks @rodboev. (#4845, closes #4757)
+
 ## [v0.51.628] — 2026-06-24 — Release WI (no ghost messages after edit/retry/undo)
 
 ### Fixed
