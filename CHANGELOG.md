@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.660] — 2026-06-25 — Release XP (terminal output and diffs survive a reload)
+
+### Fixed
+
+- **Terminal command output and patch/edit diffs no longer intermittently vanish after a reload in the transparent activity stream.** A settled tool card renders its output/diff from a `snippet`, but on a cold or paginated reload the card could rebuild from the raw assistant message envelope — which carries the command but not the result — and the join to the separate result message would sometimes miss (id mismatch, recovery-rebuilt turn), leaving the body empty. The rebuild now falls back to the durable per-tool snippet from the persisted session summary across all tool formats (OpenAI, Anthropic `tool_use`, and partial), and the loaded summary is now carried onto the session object so that fallback source is populated on cold load. The live in-memory enrichment becomes a fast path rather than the only path that shows the body. (#4927, completes #4925)
+
 ## [v0.51.659] — 2026-06-25 — Release XO (one-click extension install works with no setup)
 
 ### Fixed
